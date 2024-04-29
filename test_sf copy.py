@@ -88,7 +88,7 @@ def create_training_network(n_input, n_e, n_i):
                        dapost2/dt = -apost2 / tau_post2 : 1 (clock-driven)
                        '''
     synapse_eqs_pre_neg = '''
-                      ge_post -= w
+                      ge_post += w
                       apre = 1
                       w = clip(w - 0.0001 * apost, 0, 1)
                       '''
@@ -159,7 +159,7 @@ def create_testing_network(n_input, n_e, n_i, suffix="0"):
     
     input_group_neg = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inn")
     
-    synapses_input_neg = b2.Synapses(input_group_neg, neuron_group_e, 'w : 1', on_pre='ge_post -= w', method='exact', name="s_inne")
+    synapses_input_neg = b2.Synapses(input_group_neg, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_inne")
 
     synapses_input_pos.connect()
     if suffix != "":
@@ -289,10 +289,10 @@ if __name__ == "__main__":
 
             if train_mode:
                 neuron_group_e.theta = 0 * b2.volt
-                synapses_input_pos.w = [b2.random() * 0.2 + 0.2 for i in range(100)]
-                synapses_input_neg.w = [b2.random() * 0.2 + 0.2 for i in range(100)]
-                # synapses_input_pos.w = fill_weights(sf, False)
-                # synapses_input_neg.w = fill_weights(sf, True)
+                synapses_input_pos.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
+                synapses_input_neg.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
+                #synapses_input_pos.w = fill_weights(sf, False)
+                #synapses_input_neg.w = fill_weights(sf, True)
 
             if train_mode:
                 # This is where we train the network (stdp mechanism changes the weights)
@@ -363,7 +363,7 @@ if __name__ == "__main__":
             #
             # This is where we test performances
             # We present a lot of signals and check if the network can recognize them correctly
-            print(" > Calculating performances... 00000/1000", end="", flush=True)
+            print(" > Calculating performances... 0000/1000", end="", flush=True)
             choices = []
             for i in range(1001):
                 print(f"\033[s\033[" + str(6 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True)                
