@@ -55,6 +55,8 @@ def create_training_network(n_input, n_e, n_i):
     input_group_pos = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inp")
     
     input_group_neg = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inn")
+    
+    
 
     synapse_eqs_stdp_pos = '''
                        w : 1
@@ -67,6 +69,8 @@ def create_training_network(n_input, n_e, n_i):
                       ge_post += w
                       apre = 1
                       w = clip(w - 0.0001 * apost, 0, 1)
+                      w_neg = synapses_input_neg.w[postsynaptic_indices]
+                      synapses_input_neg.w[postsynaptic_indices] = clip(w_neg - 0.01 * apre * w, 0, 1)
                       '''
     synapse_eqs_post_pos = '''
                        post2before = apost2
@@ -74,11 +78,6 @@ def create_training_network(n_input, n_e, n_i):
                        apost = 1
                        apost2 = 1
                        '''
-    
-    synapses_input_pos = b2.Synapses(input_group_pos, neuron_group_e, synapse_eqs_stdp_pos, on_pre=synapse_eqs_pre_pos, on_post=synapse_eqs_post_pos, method='exact', name="s_inpe")
-
-    synapses_input_pos.connect()
-    synapses_input_pos.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
     
     synapse_eqs_stdp_neg = '''
                        w : 1
@@ -91,6 +90,8 @@ def create_training_network(n_input, n_e, n_i):
                       ge_post += w
                       apre = 1
                       w = clip(w - 0.0001 * apost, 0, 1)
+                      w_pos = synapses_input_pos.w[postsynaptic_indices]
+                      synapses_input_pos.w[postsynaptic_indices] = clip(w_pos - 0.01 * apre * w, 0, 1)
                       '''
     synapse_eqs_post_neg = '''
                        post2before = apost2
@@ -99,10 +100,21 @@ def create_training_network(n_input, n_e, n_i):
                        apost2 = 1
                        '''
     
-    synapses_input_neg = b2.Synapses(input_group_neg, neuron_group_e, synapse_eqs_stdp_neg, on_pre=synapse_eqs_pre_neg, on_post=synapse_eqs_post_neg, method='exact', name="s_inne")
+    synapses_input_pos = b2.Synapses(input_group_pos, neuron_group_e, synapse_eqs_stdp_pos, on_pre=synapse_eqs_pre_pos, 
+                                     on_post=synapse_eqs_post_pos.format(postsynaptic_indices=postsynaptic_indices), method='exact', name="s_inpe")
+
+    synapses_input_pos.connect()
+    synapses_input_pos.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    
+    synapses_input_neg = b2.Synapses(input_group_neg, neuron_group_e, synapse_eqs_stdp_neg, on_pre=synapse_eqs_pre_neg, 
+                                     on_post=synapse_eqs_post_neg.format(postsynaptic_indices=postsynaptic_indices), method='exact', name="s_inne")
 
     synapses_input_neg.connect()
     synapses_input_neg.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    
+    postsynaptic_indices_pos = synapses_input_pos.j
+    postsynaptic_indices_neg = synapses_input_neg.j
+    postsynaptic_indices = np.intersect1d(postsynaptic_indices_pos, postsynaptic_indices_neg)
 
     groups = [input_group_pos, input_group_neg, neuron_group_e, neuron_group_i, synapses_ei, synapses_ie, synapses_input_pos, synapses_input_neg]
     # monitors = [b2.StateMonitor(neuron_group_e, ['v', 'gi', 'theta'], record=True, name="M"), b2.StateMonitor(neuron_group_i, ['v', 'ge'], record=True, name="M4"), b2.StateMonitor(synapses_input, ['w', 'apre', 'apost', 'apost2'], record=True, name="M3")]
