@@ -51,60 +51,79 @@ def create_training_network(n_input, n_e, n_i):
     synapses_ie = b2.Synapses(neuron_group_i, neuron_group_e, 'w : 1', on_pre='gi_post += w', name="s_ie")
     synapses_ie.connect(condition='j != i')
     synapses_ie.w = 17
-
-    input_group_pos = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inp")
     
-    input_group_neg = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inn")
+    
+    # Couche intermédiaire
+    
+    neuron_group_intp_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intp_e")
+    neuron_group_intn_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intn_e")
+    neuron_group_intp_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intp_i")
+    neuron_group_intn_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intn_i")
 
-    synapse_eqs_stdp_pos = '''
+    synapses_intp_ei = b2.Synapses(neuron_group_intp_e, neuron_group_intp_i, 'w : 1', on_pre='ge_post += w', name="s_intp_ei")
+    synapses_intp_ei.connect(j='i')
+    synapses_intp_ei.w = 15
+
+    synapses_intp_ie = b2.Synapses(neuron_group_intp_i, neuron_group_intp_e, 'w : 1', on_pre='gi_post += w', name="s_intp_ie")
+    synapses_intp_ie.connect(condition='j != i')
+    synapses_intp_ie.w = 17
+    
+    synapses_intn_ei = b2.Synapses(neuron_group_intn_e, neuron_group_intn_i, 'w : 1', on_pre='ge_post += w', name="s_intn_ei")
+    synapses_intn_ei.connect(j='i')
+    synapses_intn_ei.w = 15
+
+    synapses_intn_ie = b2.Synapses(neuron_group_intn_i, neuron_group_intn_e, 'w : 1', on_pre='gi_post += w', name="s_intn_ie")
+    synapses_intn_ie.connect(condition='j != i')
+    synapses_intn_ie.w = 17
+
+    synapse_eqs_stdp = '''
                        w : 1
                        post2before: 1
                        dapre/dt = -apre / tau_pre : 1 (clock-driven)
                        dapost/dt = -(apost-0.3) / tau_post : 1 (clock-driven)
                        dapost2/dt = -apost2 / tau_post2 : 1 (clock-driven)
                        '''
-    synapse_eqs_pre_pos = '''
+    synapse_eqs_pre = '''
                       ge_post += w
                       apre = 1
                       w = clip(w - 0.0001 * apost, 0, 1)
                       '''
-    synapse_eqs_post_pos = '''
+    synapse_eqs_post = '''
                        post2before = apost2
                        w = clip(w + 0.01 * apre * post2before, 0, 1)
                        apost = 1
                        apost2 = 1
                        '''
-    
-    synapses_input_pos = b2.Synapses(input_group_pos, neuron_group_e, synapse_eqs_stdp_pos, on_pre=synapse_eqs_pre_pos, on_post=synapse_eqs_post_pos, method='exact', name="s_inpe")
+                       
+    synapses_intp = b2.Synapses(neuron_group_intp_e, neuron_group_e, synapse_eqs_stdp, on_pre=synapse_eqs_pre, on_post=synapse_eqs_post, method='exact', name="s_intpe")
 
-    synapses_input_pos.connect()
-    synapses_input_pos.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    synapses_intp.connect(j='i')
+    synapses_intp.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
     
-    synapse_eqs_stdp_neg = '''
-                       w : 1
-                       post2before: 1
-                       dapre/dt = -apre / tau_pre : 1 (clock-driven)
-                       dapost/dt = -(apost-0.3) / tau_post : 1 (clock-driven)
-                       dapost2/dt = -apost2 / tau_post2 : 1 (clock-driven)
-                       '''
-    synapse_eqs_pre_neg = '''
-                      ge_post += w
-                      apre = 1
-                      w = clip(w - 0.0001 * apost, 0, 1)
-                      '''
-    synapse_eqs_post_neg = '''
-                       post2before = apost2
-                       w = clip(w + 0.01 * apre * post2before, 0, 1)
-                       apost = 1
-                       apost2 = 1
-                       '''
+    synapses_intn = b2.Synapses(neuron_group_intn_e, neuron_group_e, synapse_eqs_stdp, on_pre=synapse_eqs_pre, on_post=synapse_eqs_post, method='exact', name="s_intne")
+
+    synapses_intn.connect(j='i')
+    synapses_intn.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
+
+
+    # Input
     
-    synapses_input_neg = b2.Synapses(input_group_neg, neuron_group_e, synapse_eqs_stdp_neg, on_pre=synapse_eqs_pre_neg, on_post=synapse_eqs_post_neg, method='exact', name="s_inne")
+    input_group_pos = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inpp")
+    
+    input_group_neg = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inpn")
+    
+    synapses_inpp = b2.Synapses(input_group_pos, neuron_group_intp_e, synapse_eqs_stdp, on_pre=synapse_eqs_pre, on_post=synapse_eqs_post, method='exact', name="s_inpp_intp")
 
-    synapses_input_neg.connect()
-    synapses_input_neg.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    synapses_inpp.connect()
+    synapses_inpp.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    
+    synapses_inpn = b2.Synapses(input_group_neg, neuron_group_intn_e, synapse_eqs_stdp, on_pre=synapse_eqs_pre, on_post=synapse_eqs_post, method='exact', name="s_inpn_intn")
 
-    groups = [input_group_pos, input_group_neg, neuron_group_e, neuron_group_i, synapses_ei, synapses_ie, synapses_input_pos, synapses_input_neg]
+    synapses_inpn.connect()
+    synapses_inpn.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+
+    groups = [input_group_pos, input_group_neg, neuron_group_intp_e, neuron_group_intp_i, neuron_group_intn_e, neuron_group_intn_i, neuron_group_e, neuron_group_i, 
+              synapses_ei, synapses_ie, synapses_intp, synapses_intn, synapses_inpp, synapses_inpn]
     # monitors = [b2.StateMonitor(neuron_group_e, ['v', 'gi', 'theta'], record=True, name="M"), b2.StateMonitor(neuron_group_i, ['v', 'ge'], record=True, name="M4"), b2.StateMonitor(synapses_input, ['w', 'apre', 'apost', 'apost2'], record=True, name="M3")]
     net = b2.Network(groups)  # , monitors)
 
@@ -152,24 +171,61 @@ def create_testing_network(n_input, n_e, n_i, suffix="0"):
     synapses_ie = b2.Synapses(neuron_group_i, neuron_group_e, 'w : 1', on_pre='gi_post += w', name="s_ie")
     synapses_ie.connect(condition='j != i')
     synapses_ie.w = 17
+    
+    # Couche intermédiaire
+    
+    neuron_group_intp_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intp_e")
+    neuron_group_intn_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intn_e")
+    neuron_group_intp_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intp_i")
+    neuron_group_intn_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intn_i")
 
-    input_group_pos = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inp")
-    
-    synapses_input_pos = b2.Synapses(input_group_pos, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_inpe")
-    
-    input_group_neg = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inn")
-    
-    synapses_input_neg = b2.Synapses(input_group_neg, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_inne")
+    synapses_intp_ei = b2.Synapses(neuron_group_intp_e, neuron_group_intp_i, 'w : 1', on_pre='ge_post += w', name="s_intp_ei")
+    synapses_intp_ei.connect(j='i')
+    synapses_intp_ei.w = 15
 
-    synapses_input_pos.connect()
+    synapses_intp_ie = b2.Synapses(neuron_group_intp_i, neuron_group_intp_e, 'w : 1', on_pre='gi_post += w', name="s_intp_ie")
+    synapses_intp_ie.connect(condition='j != i')
+    synapses_intp_ie.w = 17
+    
+    synapses_intn_ei = b2.Synapses(neuron_group_intn_e, neuron_group_intn_i, 'w : 1', on_pre='ge_post += w', name="s_intn_ei")
+    synapses_intn_ei.connect(j='i')
+    synapses_intn_ei.w = 15
+
+    synapses_intn_ie = b2.Synapses(neuron_group_intn_i, neuron_group_intn_e, 'w : 1', on_pre='gi_post += w', name="s_intn_ie")
+    synapses_intn_ie.connect(condition='j != i')
+    synapses_intn_ie.w = 17
+    
+    synapses_intp = b2.Synapses(neuron_group_intp_e, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_intpe")
+
+    synapses_intp.connect(j='i')
+    synapses_intp.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
+    
+    synapses_intn = b2.Synapses(neuron_group_intn_e, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_intne")
+
+    synapses_intn.connect(j='i')
+    synapses_intn.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
+
+
+    # Input
+    
+    input_group_pos = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inpp")
+    
+    synapses_inpp = b2.Synapses(input_group_pos, neuron_group_intp_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_inpp_intp")
+    
+    input_group_neg = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inpn")
+    
+    synapses_inpn = b2.Synapses(input_group_neg, neuron_group_intn_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_inpn_intn")
+
+    synapses_inpp.connect()
     if suffix != "":
-        synapses_input_pos.w = np.load('storage/weights/input_' + suffix + '.npy')
+        synapses_inpp.w = np.load('storage/weights/input_' + suffix + '.npy')
         
-    synapses_input_neg.connect()
+    synapses_inpn.connect()
     if suffix != "":
-        synapses_input_neg.w = np.load('storage/weights/input_' + suffix + '.npy')
+        synapses_inpn.w = np.load('storage/weights/input_' + suffix + '.npy')
 
-    groups = [input_group_pos, input_group_neg, neuron_group_e, neuron_group_i, synapses_ei, synapses_ie, synapses_input_pos, synapses_input_neg]
+    groups = [input_group_pos, input_group_neg, neuron_group_intp_e, neuron_group_intp_i, neuron_group_intn_e, neuron_group_intn_i, neuron_group_e, neuron_group_i, 
+              synapses_ei, synapses_ie, synapses_intp, synapses_intn, synapses_inpp, synapses_inpn]
     # monitors = [b2.StateMonitor(neuron_group_e, ['v', 'gi', 'theta'], record=True, name="M"), b2.StateMonitor(neuron_group_i, ['v', 'ge'], record=True, name="M4"), b2.StateMonitor(synapses_input, ['w', 'apre', 'apost', 'apost2'], record=True, name="M3")]
     net = b2.Network(groups)
 
@@ -277,11 +333,13 @@ if __name__ == "__main__":
             print("[" + str(k) + "/20] > Testing for sf=" + str(sf))
             if train_mode:
                 training_network = create_training_network(sf, n_e, n_i)
-                input_group_pos = training_network['n_inp']
-                input_group_neg = training_network['n_inn']
+                input_group_pos = training_network['n_inpp']
+                input_group_neg = training_network['n_inpn']
                 neuron_group_e = training_network['n_e']
-                synapses_input_pos = training_network['s_inpe']
-                synapses_input_neg = training_network['s_inne']
+                synapses_inpp = training_network['s_inpp_intp']
+                synapses_inpn = training_network['s_inpn_intn']
+                synapses_intp = training_network['s_intpe']
+                synapses_intn = training_network['s_intne']
 
             testing_network = create_testing_network(sf, n_e, n_i, suffix="")
             signals = gen_signals(sf)
@@ -289,15 +347,17 @@ if __name__ == "__main__":
 
             if train_mode:
                 neuron_group_e.theta = 0 * b2.volt
-                synapses_input_pos.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
-                synapses_input_neg.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
+                synapses_inpp.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
+                synapses_inpn.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
+                synapses_intp.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
+                synapses_intn.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
                 #synapses_input_pos.w = fill_weights(sf, False)
                 #synapses_input_neg.w = fill_weights(sf, True)
 
             if train_mode:
                 # This is where we train the network (stdp mechanism changes the weights)
-                print(" > Training... 000/100", end="", flush=True)
-                for i in range(100):
+                print(" > Training... 000/150", end="", flush=True)
+                for i in range(150):
                     print(f"\033[s\033[" + str(4 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True) # just a hack to update the quota on a single line
                     input_group_pos.rates = sig1[i % 5] * 63.75 * b2.Hz
                     input_group_neg.rates = sig2[i % 5] * 63.75 * b2.Hz
@@ -308,7 +368,7 @@ if __name__ == "__main__":
 
             if train_mode:
                 print("\n > Saving theta and weights...")
-                np.save("storage/weights/input_" + str(l) + "_" + str(k), np.copy(synapses_input_pos.w))
+                np.save("storage/weights/input_" + str(l) + "_" + str(k), np.copy(synapses_inpp.w))
                 np.save("storage/theta/e_" + str(l) + "_" + str(k), neuron_group_e.theta)
 
             #
@@ -317,8 +377,10 @@ if __name__ == "__main__":
             # testing_network['n_e'].theta = np.load("storage/theta/e_"+str(l)+".npy") * b2.volt
             # testing_network['s_ine'].w = np.load("storage/weights/input_"+str(l)+".npy")
             testing_network['n_e'].theta = neuron_group_e.theta
-            testing_network['s_inpe'].w = synapses_input_pos.w
-            testing_network['s_inne'].w = synapses_input_neg.w
+            testing_network['s_inpp_intp'].w = synapses_inpp.w
+            testing_network['s_inpn_intn'].w = synapses_inpn.w
+            testing_network['s_intpe'].w = synapses_intp.w
+            testing_network['s_intne'].w = synapses_intn.w
 
             # This is where we assign a neuron to a signal, because initially we have no idea
             # which neuron has been trained to detect which signal
@@ -333,11 +395,11 @@ if __name__ == "__main__":
             for i in range(50):
                 print(f"\033[s\033[" + str(3 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True)
                 
-                testing_network["n_inp"].rates = sig1[i % 5] * 63.75 * b2.Hz
-                testing_network["n_inn"].rates = sig2[i % 5] * 63.75 * b2.Hz
+                testing_network["n_inpp"].rates = sig1[i % 5] * 63.75 * b2.Hz
+                testing_network["n_inpn"].rates = sig2[i % 5] * 63.75 * b2.Hz
                 testing_network.run(single_example_time)
-                testing_network["n_inp"].rates = 0
-                testing_network["n_inn"].rates = 0
+                testing_network["n_inpp"].rates = 0
+                testing_network["n_inpn"].rates = 0
                 testing_network.run(resting_time)
 
                 for j in range(5):
@@ -366,13 +428,13 @@ if __name__ == "__main__":
             print(" > Calculating performances... 0000/1000", end="", flush=True)
             choices = []
             for i in range(1001):
-                print(f"\033[s\033[" + str(6 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True)                
+                print(f"\033[s\033[" + str(5 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True)                
                 
-                testing_network["n_inp"].rates = sig1[i % 5] * 63.75 * b2.Hz
-                testing_network["n_inn"].rates = sig2[i % 5] * 63.75 * b2.Hz
+                testing_network["n_inpp"].rates = sig1[i % 5] * 63.75 * b2.Hz
+                testing_network["n_inpn"].rates = sig2[i % 5] * 63.75 * b2.Hz
                 testing_network.run(single_example_time)
-                testing_network["n_inp"].rates = 0
-                testing_network["n_inn"].rates = 0
+                testing_network["n_inpp"].rates = 0
+                testing_network["n_inpn"].rates = 0
                 testing_network.run(resting_time)
 
                 spike_count = np.asarray(spike_counter.count) - last_spike_count
