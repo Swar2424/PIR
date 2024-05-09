@@ -52,29 +52,16 @@ def create_training_network(n_input, n_e, n_i):
     synapses_ie.connect(condition='j != i')
     synapses_ie.w = 17
     
-    
     # Couche intermédiaire
     
-    neuron_group_intp_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intp_e")
-    neuron_group_intn_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intn_e")
-    neuron_group_intp_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intp_i")
-    neuron_group_intn_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intn_i")
-
-    synapses_intp_ei = b2.Synapses(neuron_group_intp_e, neuron_group_intp_i, 'w : 1', on_pre='ge_post += w', name="s_intp_ei")
-    synapses_intp_ei.connect(j='i')
-    synapses_intp_ei.w = 15
-
-    synapses_intp_ie = b2.Synapses(neuron_group_intp_i, neuron_group_intp_e, 'w : 1', on_pre='gi_post += w', name="s_intp_ie")
-    synapses_intp_ie.connect(condition='j != i')
-    synapses_intp_ie.w = 17
+    neuron_eqs_eint = '''
+        dv/dt = (v_rest_e - v * (1 + ge)) / (10 * ms) : volt
+        dge/dt = -ge / (1 * ms) : 1
+        dtheta/dt = -theta / (1e5 * ms) : volt
+        '''
     
-    synapses_intn_ei = b2.Synapses(neuron_group_intn_e, neuron_group_intn_i, 'w : 1', on_pre='ge_post += w', name="s_intn_ei")
-    synapses_intn_ei.connect(j='i')
-    synapses_intn_ei.w = 15
-
-    synapses_intn_ie = b2.Synapses(neuron_group_intn_i, neuron_group_intn_e, 'w : 1', on_pre='gi_post += w', name="s_intn_ie")
-    synapses_intn_ie.connect(condition='j != i')
-    synapses_intn_ie.w = 17
+    neuron_group_intp_e = b2.NeuronGroup(n_e, neuron_eqs_eint, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intp_e")
+    neuron_group_intn_e = b2.NeuronGroup(n_e, neuron_eqs_eint, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intn_e")
 
     synapse_eqs_stdp = '''
                        w : 1
@@ -90,7 +77,7 @@ def create_training_network(n_input, n_e, n_i):
                       '''
     synapse_eqs_post = '''
                        post2before = apost2
-                       w = clip(w + 0.01 * apre * post2before, 0, 1)
+                       w = clip(w + 0.05 * apre * post2before, 0, 1)
                        apost = 1
                        apost2 = 1
                        '''
@@ -105,7 +92,6 @@ def create_training_network(n_input, n_e, n_i):
     synapses_intn.connect(j='i')
     synapses_intn.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
 
-
     # Input
     
     input_group_pos = b2.PoissonGroup(n_input, 0 * b2.Hz, name="n_inpp")
@@ -115,14 +101,14 @@ def create_training_network(n_input, n_e, n_i):
     synapses_inpp = b2.Synapses(input_group_pos, neuron_group_intp_e, synapse_eqs_stdp, on_pre=synapse_eqs_pre, on_post=synapse_eqs_post, method='exact', name="s_inpp_intp")
 
     synapses_inpp.connect()
-    synapses_inpp.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    synapses_inpp.w = [b2.random() * 2 + 2 for i in range(n_input*n_e)]
     
     synapses_inpn = b2.Synapses(input_group_neg, neuron_group_intn_e, synapse_eqs_stdp, on_pre=synapse_eqs_pre, on_post=synapse_eqs_post, method='exact', name="s_inpn_intn")
 
     synapses_inpn.connect()
-    synapses_inpn.w = [b2.random() * 0.2 + 0.2 for i in range(n_input*n_e)]
+    synapses_inpn.w = [b2.random() * 2 + 2 for i in range(n_input*n_e)]
 
-    groups = [input_group_pos, input_group_neg, neuron_group_intp_e, neuron_group_intp_i, neuron_group_intn_e, neuron_group_intn_i, neuron_group_e, neuron_group_i, 
+    groups = [input_group_pos, input_group_neg, neuron_group_intp_e, neuron_group_intn_e, neuron_group_e, neuron_group_i, 
               synapses_ei, synapses_ie, synapses_intp, synapses_intn, synapses_inpp, synapses_inpn]
     # monitors = [b2.StateMonitor(neuron_group_e, ['v', 'gi', 'theta'], record=True, name="M"), b2.StateMonitor(neuron_group_i, ['v', 'ge'], record=True, name="M4"), b2.StateMonitor(synapses_input, ['w', 'apre', 'apost', 'apost2'], record=True, name="M3")]
     net = b2.Network(groups)  # , monitors)
@@ -174,37 +160,26 @@ def create_testing_network(n_input, n_e, n_i, suffix="0"):
     
     # Couche intermédiaire
     
-    neuron_group_intp_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intp_e")
-    neuron_group_intn_e = b2.NeuronGroup(n_e, neuron_eqs_e, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intn_e")
-    neuron_group_intp_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intp_i")
-    neuron_group_intn_i = b2.NeuronGroup(n_e, neuron_eqs_i, threshold='v > v_thresh_i', reset='v = v_reset_i', refractory=refrac_i, method='euler', name="n_intn_i")
-
-    synapses_intp_ei = b2.Synapses(neuron_group_intp_e, neuron_group_intp_i, 'w : 1', on_pre='ge_post += w', name="s_intp_ei")
-    synapses_intp_ei.connect(j='i')
-    synapses_intp_ei.w = 15
-
-    synapses_intp_ie = b2.Synapses(neuron_group_intp_i, neuron_group_intp_e, 'w : 1', on_pre='gi_post += w', name="s_intp_ie")
-    synapses_intp_ie.connect(condition='j != i')
-    synapses_intp_ie.w = 17
+    neuron_eqs_eint = '''
+        dv/dt = (v_rest_e - v * (1 + ge)) / (10 * ms) : volt
+        dge/dt = -ge / (1 * ms) : 1
+        dtheta/dt = -theta / (1e5 * ms) : volt
+        '''
     
-    synapses_intn_ei = b2.Synapses(neuron_group_intn_e, neuron_group_intn_i, 'w : 1', on_pre='ge_post += w', name="s_intn_ei")
-    synapses_intn_ei.connect(j='i')
-    synapses_intn_ei.w = 15
-
-    synapses_intn_ie = b2.Synapses(neuron_group_intn_i, neuron_group_intn_e, 'w : 1', on_pre='gi_post += w', name="s_intn_ie")
-    synapses_intn_ie.connect(condition='j != i')
-    synapses_intn_ie.w = 17
+    neuron_group_intp_e = b2.NeuronGroup(n_e, neuron_eqs_eint, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intp_e")
+    neuron_group_intn_e = b2.NeuronGroup(n_e, neuron_eqs_eint, threshold='v > theta + v_thresh_e', reset=reset_e, refractory=refrac_e, method='euler', name="n_intn_e")
     
     synapses_intp = b2.Synapses(neuron_group_intp_e, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_intpe")
 
     synapses_intp.connect(j='i')
-    synapses_intp.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
+    if suffix != "":
+        synapses_intp.w = np.load('storage/weights/input_' + suffix + '.npy')
     
     synapses_intn = b2.Synapses(neuron_group_intn_e, neuron_group_e, 'w : 1', on_pre='ge_post += w', method='exact', name="s_intne")
 
     synapses_intn.connect(j='i')
-    synapses_intn.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
-
+    if suffix != "":
+        synapses_intn.w = np.load('storage/weights/input_' + suffix + '.npy')
 
     # Input
     
@@ -224,7 +199,7 @@ def create_testing_network(n_input, n_e, n_i, suffix="0"):
     if suffix != "":
         synapses_inpn.w = np.load('storage/weights/input_' + suffix + '.npy')
 
-    groups = [input_group_pos, input_group_neg, neuron_group_intp_e, neuron_group_intp_i, neuron_group_intn_e, neuron_group_intn_i, neuron_group_e, neuron_group_i, 
+    groups = [input_group_pos, input_group_neg, neuron_group_intp_e, neuron_group_intn_e, neuron_group_e, neuron_group_i, 
               synapses_ei, synapses_ie, synapses_intp, synapses_intn, synapses_inpp, synapses_inpn]
     # monitors = [b2.StateMonitor(neuron_group_e, ['v', 'gi', 'theta'], record=True, name="M"), b2.StateMonitor(neuron_group_i, ['v', 'ge'], record=True, name="M4"), b2.StateMonitor(synapses_input, ['w', 'apre', 'apost', 'apost2'], record=True, name="M3")]
     net = b2.Network(groups)
@@ -349,15 +324,15 @@ if __name__ == "__main__":
                 neuron_group_e.theta = 0 * b2.volt
                 synapses_inpp.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
                 synapses_inpn.w = [b2.random() * 0.2 + 0.2 for i in range(sf * n_e)]
-                synapses_intp.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
-                synapses_intn.w = [b2.random() * 0.2 + 0.2 for i in range(n_e)]
+                synapses_intp.w = [b2.random() * 1 + 1 for i in range(n_e)]
+                synapses_intn.w = [b2.random() * 1 + 1 for i in range(n_e)]
                 #synapses_input_pos.w = fill_weights(sf, False)
                 #synapses_input_neg.w = fill_weights(sf, True)
 
             if train_mode:
                 # This is where we train the network (stdp mechanism changes the weights)
-                print(" > Training... 000/150", end="", flush=True)
-                for i in range(150):
+                print(" > Training... 000/200", end="", flush=True)
+                for i in range(200):
                     print(f"\033[s\033[" + str(4 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True) # just a hack to update the quota on a single line
                     input_group_pos.rates = sig1[i % 5] * 63.75 * b2.Hz
                     input_group_neg.rates = sig2[i % 5] * 63.75 * b2.Hz
@@ -409,8 +384,8 @@ if __name__ == "__main__":
             # We assign to each neuron the signal he has spiked to the most
             # Ex: if we stored the following spikes for neuron 1: [12, 2, 42, 15, 17], we assign it the signal 2 (start count from 0)
             # TODO: 2 neurons can have the same class (very rare thanks to homeostasis), but shouldn't
-            for j in range(5):
-                classes[j] = np.argmax(spike_count[j])
+            for h in range(5):
+                classes[h] = np.argmax(spike_count[h])
             print(" => " + str(classes))
 
             testing_network.remove(spike_counter)
@@ -425,13 +400,13 @@ if __name__ == "__main__":
             #
             # This is where we test performances
             # We present a lot of signals and check if the network can recognize them correctly
-            print(" > Calculating performances... 0000/1000", end="", flush=True)
+            print(" > Calculating performances... 000/100", end="", flush=True)
             choices = []
-            for i in range(1001):
-                print(f"\033[s\033[" + str(5 + len(str(i+1))) + "D" + str(i+1) + "\033[u", end="", flush=True)                
+            for nov in range(101):
+                print(f"\033[s\033[" + str(4 + len(str(nov+1))) + "D" + str(nov+1) + "\033[u", end="", flush=True)                
                 
-                testing_network["n_inpp"].rates = sig1[i % 5] * 63.75 * b2.Hz
-                testing_network["n_inpn"].rates = sig2[i % 5] * 63.75 * b2.Hz
+                testing_network["n_inpp"].rates = sig1[nov % 5] * 63.75 * b2.Hz
+                testing_network["n_inpn"].rates = sig2[nov % 5] * 63.75 * b2.Hz
                 testing_network.run(single_example_time)
                 testing_network["n_inpp"].rates = 0
                 testing_network["n_inpn"].rates = 0
@@ -442,16 +417,16 @@ if __name__ == "__main__":
                 choices.append(classes[np.argmax(spike_count)])
 
                 # Choices are stored over the course of the simulation (checkpoints)
-                if i % 1000 == 0 and i != 0:
-                    save_choices(choices[i-1000:i], l, k)
+                if nov % 1000 == 0 and nov != 0:
+                    save_choices(choices[nov-1000:nov], l, k)
 
             testing_network.remove(spike_counter)
 
             # We can compute the success rate during simulation,
             # but it's just cosmetics because we'll use the stored data to make a graph
             success = 0
-            for i in range(len(choices)):
-                if choices[i] == i % 5:
+            for kamot in range(len(choices)):
+                if choices[kamot] == kamot % 5:
                     success += 1
             print("\nSuccess rate: ", success / len(choices))
             perf[l][0].append(sf)
